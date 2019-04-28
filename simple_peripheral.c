@@ -1,13 +1,10 @@
 /******************************************************************************
-
  @file  simple_peripheral.c
-
  @brief This file contains the Simple BLE Peripheral sample application for use
         with the CC2650 Bluetooth Low Energy Protocol Stack.
 
  Group: WCS, BTS
  Target Device: CC2650, CC2640
-
  ******************************************************************************
  
  Copyright (c) 2013-2018, Texas Instruments Incorporated
@@ -43,11 +40,13 @@
  ******************************************************************************
  Release Name: ble_sdk_2_02_02_25
  Release Date: 2018-04-02 18:03:35
+ Modify Date: 2019-04
+ Modified by: Zekemyapp
  *****************************************************************************/
 
-/*********************************************************************
+/*************************
  * INCLUDES
- */
+ *************************/
 #include <string.h>
 
 #include <ti/sysbios/knl/Task.h>
@@ -89,7 +88,6 @@
 #endif
 
 #include "board_key.h"
-
 #include "board.h"
 
 #include "simple_peripheral.h"
@@ -98,92 +96,95 @@
 #include <driverlib/ioc.h>
 #endif // USE_FPGA | DEBUG_SW_TRACE
 
-/*********************************************************************
+
+/*****************************
  * CONSTANTS
- */
+ *****************************/
 
 // Advertising interval when device is discoverable (units of 625us, 160=100ms)
-#define DEFAULT_ADVERTISING_INTERVAL          160
+#define DEFAULT_ADVERTISING_INTERVAL        160
 
 // Limited discoverable mode advertises for 30.72s, and then stops
 // General discoverable mode advertises indefinitely
-#define DEFAULT_DISCOVERABLE_MODE             GAP_ADTYPE_FLAGS_GENERAL
+#define DEFAULT_DISCOVERABLE_MODE           GAP_ADTYPE_FLAGS_GENERAL
 
 #ifndef FEATURE_OAD
-// Minimum connection interval (units of 1.25ms, 80=100ms) if automatic
-// parameter update request is enabled
-#define DEFAULT_DESIRED_MIN_CONN_INTERVAL     80
+// Minimum connection interval (units of 1.25ms, 80=100ms)
+// if automatic parameter update request is enabled
+#define DEFAULT_DESIRED_MIN_CONN_INTERVAL   80
 
-// Maximum connection interval (units of 1.25ms, 800=1000ms) if automatic
-// parameter update request is enabled
-#define DEFAULT_DESIRED_MAX_CONN_INTERVAL     800
+// Maximum connection interval (units of 1.25ms, 800=1000ms) 
+// if automatic parameter update request is enabled
+#define DEFAULT_DESIRED_MAX_CONN_INTERVAL   800
+
 #else //!FEATURE_OAD
 // Minimum connection interval (units of 1.25ms, 8=10ms) if automatic
 // parameter update request is enabled
-#define DEFAULT_DESIRED_MIN_CONN_INTERVAL     8
+#define DEFAULT_DESIRED_MIN_CONN_INTERVAL	8
 
 // Maximum connection interval (units of 1.25ms, 8=10ms) if automatic
 // parameter update request is enabled
-#define DEFAULT_DESIRED_MAX_CONN_INTERVAL     8
+#define DEFAULT_DESIRED_MAX_CONN_INTERVAL	8
 #endif // FEATURE_OAD
 
 // Slave latency to use if automatic parameter update request is enabled
-#define DEFAULT_DESIRED_SLAVE_LATENCY         0
+#define DEFAULT_DESIRED_SLAVE_LATENCY     	0
 
 // Supervision timeout value (units of 10ms, 1000=10s) if automatic parameter
 // update request is enabled
-#define DEFAULT_DESIRED_CONN_TIMEOUT          1000
+#define DEFAULT_DESIRED_CONN_TIMEOUT      	1000
 
-// Whether to enable automatic parameter update request when a connection is
-// formed
-#define DEFAULT_ENABLE_UPDATE_REQUEST         GAPROLE_LINK_PARAM_UPDATE_INITIATE_BOTH_PARAMS
+// Whether to enable automatic parameter update request when a connection is formed
+#define DEFAULT_ENABLE_UPDATE_REQUEST     	GAPROLE_LINK_PARAM_UPDATE_INITIATE_BOTH_PARAMS
 
 // Connection Pause Peripheral time value (in seconds)
-#define DEFAULT_CONN_PAUSE_PERIPHERAL         6
+#define DEFAULT_CONN_PAUSE_PERIPHERAL     	6
 
 // How often to perform periodic event (in msec)
-#define SBP_PERIODIC_EVT_PERIOD               5000
+#define SBP_PERIODIC_EVT_PERIOD           	5000
 
 #ifdef FEATURE_OAD
 // The size of an OAD packet.
-#define OAD_PACKET_SIZE                       ((OAD_BLOCK_SIZE) + 2)
+#define OAD_PACKET_SIZE                   	((OAD_BLOCK_SIZE) + 2)
 #endif // FEATURE_OAD
 
 // Task configuration
-#define SBP_TASK_PRIORITY                     1
+#define SBP_TASK_PRIORITY                 	1
 
 #ifndef SBP_TASK_STACK_SIZE
-#define SBP_TASK_STACK_SIZE                   644
+#define SBP_TASK_STACK_SIZE               	644
 #endif
 
 // Internal Events for RTOS application
-#define SBP_STATE_CHANGE_EVT                  0x0001
-#define SBP_CHAR_CHANGE_EVT                   0x0002
-#define SBP_PERIODIC_EVT                      0x0004
-#define SBP_CONN_EVT_END_EVT                  0x0008
+#define SBP_STATE_CHANGE_EVT              	0x0001
+#define SBP_CHAR_CHANGE_EVT               	0x0002
+#define SBP_PERIODIC_EVT                  	0x0004
+#define SBP_CONN_EVT_END_EVT              	0x0008
 
-/*********************************************************************
+
+/*********************************
  * TYPEDEFS
- */
+ *********************************/
 
 // App event passed from profiles.
-typedef struct
-{
+typedef struct {
   appEvtHdr_t hdr;  // event header.
 } sbpEvt_t;
 
-/*********************************************************************
+
+/**********************************
  * GLOBAL VARIABLES
- */
+ **********************************/
 
 // Display Interface
 #ifdef USE_DISPLAY
 Display_Handle dispHandle = NULL;
 #endif
 
-/*********************************************************************
+
+/***********************************
  * LOCAL VARIABLES
- */
+ ***********************************/
 
 // Entity ID globally used to check for source and/or destination of messages
 static ICall_EntityID selfEntity;
@@ -198,14 +199,14 @@ static Clock_Struct periodicClock;
 static Queue_Struct appMsg;
 static Queue_Handle appMsgQueue;
 
+// events flag for internal application events.
+static uint16_t events;
+
 #if defined(FEATURE_OAD)
 // Event data from OAD profile.
 static Queue_Struct oadQ;
 static Queue_Handle hOadQ;
 #endif //FEATURE_OAD
-
-// events flag for internal application events.
-static uint16_t events;
 
 // Task configuration
 Task_Struct sbpTask;
@@ -215,30 +216,12 @@ Char sbpTaskStack[SBP_TASK_STACK_SIZE];
 //static gaprole_States_t gapProfileState = GAPROLE_INIT;
 
 // GAP - SCAN RSP data (max size = 31 bytes)
-static uint8_t scanRspData[] =
-{
+static uint8_t scanRspData[] = {
   // complete name
   0x14,   // length of this data
   GAP_ADTYPE_LOCAL_NAME_COMPLETE,
-  'S',
-  'i',
-  'm',
-  'p',
-  'l',
-  'e',
-  'B',
-  'L',
-  'E',
-  'P',
-  'e',
-  'r',
-  'i',
-  'p',
-  'h',
-  'e',
-  'r',
-  'a',
-  'l',
+  'S', 'i', 'm', 'p', 'l', 'e', 'B','L','E',
+  'P', 'e','r','i','p','h','e','r','a','l',
 
   // connection interval range
   0x05,   // length of this data
@@ -254,10 +237,9 @@ static uint8_t scanRspData[] =
   0       // 0dBm
 };
 
-// GAP - Advertisement data (max size = 31 bytes, though this is
-// best kept short to conserve power while advertisting)
-static uint8_t advertData[] =
-{
+// GAP - Advertisement data (max size = 31 bytes)
+// This is best kept short to conserve power while advertisting)
+static uint8_t advertData[] = {
   // Flags; this sets the device to use limited discoverable
   // mode (advertises for 30 seconds at a time) instead of general
   // discoverable mode (advertises indefinitely)
