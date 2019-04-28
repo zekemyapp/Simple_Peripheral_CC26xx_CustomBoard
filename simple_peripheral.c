@@ -79,13 +79,7 @@
 #include "rcosc_calibration.h"
 #endif //USE_RCOSC
 
-#ifdef USE_DISPLAY
-#include <ti/mw/display/Display.h>
-#else
 #include <xdc/runtime/System.h>
-#define Display_print1(handle, var1, var2, text, ...) ({System_printf(text,__VA_ARGS__); System_printf("\n"); System_flush();})
-#define Display_print0(handle, var1, var2, text) ({System_printf(text); System_printf("\n"); System_flush();})
-#endif
 
 #include "board_key.h"
 #include "board.h"
@@ -176,11 +170,6 @@ typedef struct {
  * GLOBAL VARIABLES
  **********************************/
 
-// Display Interface
-#ifdef USE_DISPLAY
-Display_Handle dispHandle = NULL;
-#endif
-
 
 /***********************************
  * LOCAL VARIABLES
@@ -240,15 +229,14 @@ static uint8_t scanRspData[] = {
 // GAP - Advertisement data (max size = 31 bytes)
 // This is best kept short to conserve power while advertisting)
 static uint8_t advertData[] = {
-  // Flags; this sets the device to use limited discoverable
-  // mode (advertises for 30 seconds at a time) instead of general
-  // discoverable mode (advertises indefinitely)
+  // Flags.
+  // This sets the device to use limited discoverable mode (advertises for 30 seconds at a time)
+  // instead of general discoverable mode (advertises indefinitely)
   0x02,   // length of this data
   GAP_ADTYPE_FLAGS,
   DEFAULT_DISCOVERABLE_MODE | GAP_ADTYPE_FLAGS_BREDR_NOT_SUPPORTED,
 
-  // service UUID, to notify central devices what services are included
-  // in this peripheral
+  // service UUID, to notify central devices what services are included in this peripheral
 #if !defined(FEATURE_OAD) || defined(FEATURE_OAD_ONCHIP)
   0x03,   // length of this data
 #else //OAD for external flash
@@ -272,9 +260,10 @@ static uint8_t attDeviceName[GAP_DEVICE_NAME_LEN] = "Simple BLE Peripheral";
 static gattMsgEvent_t *pAttRsp = NULL;
 static uint8_t rspTxRetry = 0;
 
-/*********************************************************************
+
+/******************************
  * LOCAL FUNCTIONS
- */
+ ******************************/
 
 static void SimpleBLEPeripheral_init( void );
 static void SimpleBLEPeripheral_taskFxn(UArg a0, UArg a1);
@@ -297,28 +286,28 @@ static void SimpleBLEPeripheral_charValueChangeCB(uint8_t paramID);
 static void SimpleBLEPeripheral_enqueueMsg(uint8_t event, uint8_t state);
 
 #ifdef FEATURE_OAD
-void SimpleBLEPeripheral_processOadWriteCB(uint8_t event, uint16_t connHandle,
-                                           uint8_t *pData);
+void SimpleBLEPeripheral_processOadWriteCB(uint8_t event, uint16_t connHandle, uint8_t *pData);
 #endif //FEATURE_OAD
 
-/*********************************************************************
+
+/******************************
  * EXTERN FUNCTIONS
- */
+ ******************************/
+
 extern void AssertHandler(uint8 assertCause, uint8 assertSubcause);
 
-/*********************************************************************
+
+/*******************************
  * PROFILE CALLBACKS
- */
+ *******************************/
 
 // GAP Role Callbacks
-static gapRolesCBs_t SimpleBLEPeripheral_gapRoleCBs =
-{
+static gapRolesCBs_t SimpleBLEPeripheral_gapRoleCBs = {
   SimpleBLEPeripheral_stateChangeCB     // Profile State Change Callbacks
 };
 
 // GAP Bond Manager Callbacks
-static gapBondCBs_t simpleBLEPeripheral_BondMgrCBs =
-{
+static gapBondCBs_t simpleBLEPeripheral_BondMgrCBs = {
   NULL, // Passcode callback (not used by application)
   NULL  // Pairing / Bonding state Callback (not used by application)
 };
@@ -338,10 +327,9 @@ static oadTargetCBs_t simpleBLEPeripheral_oadCBs =
 #endif //FEATURE_OAD
 
 
-
-/***************************
- * PUBLIC FUNCTIONS
- ***************************/
+/*******************************
+ * PUBLIC FUNCTIONS DEFINITION
+ *******************************/
 
 /**
  * @fn      SimpleBLEPeripheral_createTask
@@ -360,6 +348,11 @@ void SimpleBLEPeripheral_createTask(void) {
 
   Task_construct(&sbpTask, SimpleBLEPeripheral_taskFxn, &taskParams, NULL);
 }
+
+
+/*******************************
+ * LOCAL FUNCTIONS DEFINITION
+ *******************************/
 
 /**
  * @fn      SimpleBLEPeripheral_init
@@ -400,10 +393,6 @@ static void SimpleBLEPeripheral_init(void) {
     IOCPortConfigureSet(IOID_8, IOC_PORT_RFC_TRC, IOC_STD_OUTPUT | IOC_CURRENT_4MA | IOC_SLEW_ENABLE);
   #endif // DEBUG_SW_TRACE
 #endif // USE_FPGA
-
-#ifdef USE_DISPLAY
-  dispHandle = Display_open(Display_Type_LCD, NULL);
-#endif
 
   // Create an RTOS queue for message from profile to be sent to app.
   appMsgQueue = Util_constructQueue(&appMsg);
@@ -542,13 +531,15 @@ static void SimpleBLEPeripheral_init(void) {
 
 #if defined FEATURE_OAD
 #if defined (HAL_IMAGE_A)
-  Display_print0(dispHandle, 0, 0, "BLE Peripheral A");
+  System_printf("BLE Peripheral A\n");
 #else
-  Display_print0(dispHandle, 0, 0, "BLE Peripheral B");
+  System_printf("BLE Peripheral B\n");
 #endif // HAL_IMAGE_A
 #else
-  Display_print0(dispHandle, 0, 0, "BLE Peripheral");
+  System_printf("BLE Peripheral\n");
 #endif // FEATURE_OAD
+
+  System_flush();
 }
 
 /**
@@ -712,11 +703,13 @@ static uint8_t SimpleBLEPeripheral_processGATTMsg(gattMsgEvent_t *pMsg) {
     // The app is informed in case it wants to drop the connection.
 
     // Display the opcode of the message that caused the violation.
-    Display_print1(dispHandle, 5, 0, "FC Violated: %d", pMsg->msg.flowCtrlEvt.opcode);
+    System_printf("FC Violated: %d\n", pMsg->msg.flowCtrlEvt.opcode);
+    System_flush();
 
   } else if (pMsg->method == ATT_MTU_UPDATED_EVENT) {
     // MTU size updated
-    Display_print1(dispHandle, 5, 0, "MTU Size: %d", pMsg->msg.mtuEvt.MTU);
+    System_printf("MTU Size: %d\n", pMsg->msg.mtuEvt.MTU);
+    System_flush();
   }
 
   // Free message payload. Needed only for ATT Protocol messages
@@ -753,7 +746,8 @@ static void SimpleBLEPeripheral_sendAttRsp(void) {
 
     } else {
       // Continue retrying
-      Display_print1(dispHandle, 5, 0, "Rsp send retry: %d", rspTxRetry);
+      System_printf("Rsp send retry: %d\n", rspTxRetry);
+      System_flush();
     }
   }
 }
@@ -770,13 +764,15 @@ static void SimpleBLEPeripheral_freeAttRsp(uint8_t status) {
   if (pAttRsp != NULL) {
     // See if the response was sent out successfully
     if (status == SUCCESS) {
-      Display_print1(dispHandle, 5, 0, "Rsp sent retry: %d", rspTxRetry);
+      System_printf("Rsp sent retry: %d\n", rspTxRetry);
+      System_flush();
 
     } else {
       // Free response payload
       GATT_bm_free(&pAttRsp->msg, pAttRsp->method);
 
-      Display_print1(dispHandle, 5, 0, "Rsp retry failed: %d", rspTxRetry);
+      System_printf("Rsp retry failed: %d\n", rspTxRetry);
+      System_flush();
     }
 
     // Free response message
@@ -861,13 +857,16 @@ static void SimpleBLEPeripheral_processStateChangeEvt(gaprole_States_t newState)
         DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
 
         // Display device address
-        Display_print0(dispHandle, 1, 0, Util_convertBdAddr2Str(ownAddress));
-        Display_print0(dispHandle, 2, 0, "Initialized");
+        System_printf(Util_convertBdAddr2Str(ownAddress));
+        System_printf("\n");
+        System_printf("Initialized\n");
+        System_flush();
       }
       break;
 
     case GAPROLE_ADVERTISING:
-      Display_print0(dispHandle, 2, 0, "Advertising");
+        System_printf("Advertising\n");
+        System_flush();
       break;
 
 #ifdef PLUS_BROADCASTER
@@ -910,16 +909,20 @@ static void SimpleBLEPeripheral_processStateChangeEvt(gaprole_States_t newState)
         // Use numActive to determine the connection handle of the last
         // connection
         if ( linkDB_GetInfo( numActive - 1, &linkInfo ) == SUCCESS ) {
-          Display_print1(dispHandle, 2, 0, "Num Conns: %d", (uint16_t)numActive);
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(linkInfo.addr));
+          System_printf("Num Conns: %d\n", (uint16_t)numActive);
+          System_printf(Util_convertBdAddr2Str(linkInfo.addr));
+          System_printf("\n");
+          System_flush();
 
         } else {
           uint8_t peerAddress[B_ADDR_LEN];
 
           GAPRole_GetParameter(GAPROLE_CONN_BD_ADDR, peerAddress);
 
-          Display_print0(dispHandle, 2, 0, "Connected");
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(peerAddress));
+          System_printf("Connected\n");
+          System_printf(Util_convertBdAddr2Str(peerAddress));
+          System_printf("\n");
+          System_flush();
         }
 
         #ifdef PLUS_BROADCASTER
@@ -947,30 +950,23 @@ static void SimpleBLEPeripheral_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_CONNECTED_ADV:
-      Display_print0(dispHandle, 2, 0, "Connected Advertising");
+      System_printf("Connected Advertising\n");
+      System_flush();
       break;
 
     case GAPROLE_WAITING:
       Util_stopClock(&periodicClock);
       SimpleBLEPeripheral_freeAttRsp(bleNotConnected);
 
-      Display_print0(dispHandle, 2, 0, "Disconnected");
-
-      // Clear remaining lines
-#ifdef USE_DISPLAY
-      Display_clearLines(dispHandle, 3, 5);
-#endif
+      System_printf("Disconnected\n");
+      System_flush();
       break;
 
     case GAPROLE_WAITING_AFTER_TIMEOUT:
       SimpleBLEPeripheral_freeAttRsp(bleNotConnected);
 
-      Display_print0(dispHandle, 2, 0, "Timed Out");
-
-#ifdef USE_DISPLAY
-      // Clear remaining lines
-      Display_clearLines(dispHandle, 3, 5);
-#endif
+      System_printf("Timed Out\n");
+      System_flush();
 
       #ifdef PLUS_BROADCASTER
         // Reset flag for next connection.
@@ -979,13 +975,11 @@ static void SimpleBLEPeripheral_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_ERROR:
-      Display_print0(dispHandle, 2, 0, "Error");
+      System_printf("Error\n");
+      System_flush();
       break;
 
     default:
-#ifdef USE_DISPLAY
-      Display_clearLine(dispHandle, 2);
-#endif
       break;
   }
 
@@ -1022,12 +1016,14 @@ static void SimpleBLEPeripheral_processCharValueChangeEvt(uint8_t paramID) {
   switch(paramID) {
     case SIMPLEPROFILE_CHAR1:
       SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR1, &newValue);
-      Display_print1(dispHandle, 4, 0, "Char 1: %d", (uint16_t)newValue);
+      System_printf("Char 1: %d\n", (uint16_t)newValue);
+      System_flush();
       break;
 
     case SIMPLEPROFILE_CHAR3:
       SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR3, &newValue);
-      Display_print1(dispHandle, 4, 0, "Char 3: %d", (uint16_t)newValue);
+      System_printf("Char 3: %d\n", (uint16_t)newValue);
+      System_flush();
       break;
 
     default:
