@@ -22,10 +22,10 @@ Regarding the application, only the modified files are included. You will need t
 ## Features
 
 - Uses System_printf instead of LCD Display to show the application info
+- Implements one button and one LED.
+- Pins can be configured on board_key.h
 
 ## TBD
 
-- Remove Display code
+- Enable/Disable advertisement on button press
 - Try OAD
-- Add Switch
-- Add LED

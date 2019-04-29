@@ -85,6 +85,7 @@
 #include "board.h"
 
 #include "simple_peripheral.h"
+#include "board_key.h"
 
 #if defined( USE_FPGA ) || defined( DEBUG_SW_TRACE )
 #include <driverlib/ioc.h>
@@ -154,6 +155,7 @@
 #define SBP_CHAR_CHANGE_EVT               	0x0002
 #define SBP_PERIODIC_EVT                  	0x0004
 #define SBP_CONN_EVT_END_EVT              	0x0008
+#define SBC_KEY_CHANGE_EVT                  0x0010
 
 
 /*********************************
@@ -200,6 +202,9 @@ static Queue_Handle hOadQ;
 // Task configuration
 Task_Struct sbpTask;
 Char sbpTaskStack[SBP_TASK_STACK_SIZE];
+
+Task_Struct sbpLEDTask;
+Char sbpLEDTaskStack[SBP_TASK_STACK_SIZE];
 
 // Profile state and parameters
 //static gaprole_States_t gapProfileState = GAPROLE_INIT;
@@ -278,6 +283,9 @@ static void SimpleBLEPeripheral_clockHandler(UArg arg);
 
 static void SimpleBLEPeripheral_sendAttRsp(void);
 static void SimpleBLEPeripheral_freeAttRsp(uint8_t status);
+
+void SimpleBLECentral_keyChangeHandler(uint8 keys);
+static void SimpleBLECentral_handleKeys(uint8_t shift, uint8_t keys);
 
 static void SimpleBLEPeripheral_stateChangeCB(gaprole_States_t newState);
 #ifndef FEATURE_OAD_ONCHIP
@@ -400,6 +408,9 @@ static void SimpleBLEPeripheral_init(void) {
   // Create one-shot clocks for internal periodic events.
   Util_constructClock(&periodicClock, SimpleBLEPeripheral_clockHandler,
                       SBP_PERIODIC_EVT_PERIOD, 0, false, SBP_PERIODIC_EVT);
+
+  Board_initLed();
+  Board_initKeys(SimpleBLECentral_keyChangeHandler);
 
   // GAP Configuration
   GAP_SetParamValue(TGAP_CONN_PAUSE_PERIPHERAL, DEFAULT_CONN_PAUSE_PERIPHERAL);
@@ -802,6 +813,10 @@ static void SimpleBLEPeripheral_processAppMsg(sbpEvt_t *pMsg) {
       SimpleBLEPeripheral_processCharValueChangeEvt(pMsg->hdr.state);
       break;
 
+    case SBC_KEY_CHANGE_EVT:
+      SimpleBLECentral_handleKeys(0, pMsg->hdr.state);
+      break;
+
     default:
       // Do nothing.
       break;
@@ -1089,6 +1104,39 @@ static void SimpleBLEPeripheral_enqueueMsg(uint8_t event, uint8_t state) {
 
     // Enqueue the message.
     Util_enqueueMsg(appMsgQueue, sem, (uint8*)pMsg);
+  }
+}
+
+
+/*********************************************************************
+ * @fn      SimpleBLECentral_keyChangeHandler
+ * @brief   Key event handler function
+ *
+ * @param   a0 - ignored
+ * @return  none
+ */
+void SimpleBLECentral_keyChangeHandler(uint8 keys) {
+  SimpleBLEPeripheral_enqueueMsg(SBC_KEY_CHANGE_EVT, keys);
+}
+
+
+/*********************************************************************
+ * @fn      SimpleBLECentral_handleKeys
+ * @brief   Handles all key events for this device.
+ *
+ * @param   shift - true if in shift/alt.
+ * @param   keys - bit field for key events. Valid entries:
+ *                 HAL_KEY_SW_2
+ *                 HAL_KEY_SW_1
+ * @return  none
+ */
+static void SimpleBLECentral_handleKeys(uint8_t shift, uint8_t keys) {
+  (void)shift;  // Intentionally unreferenced parameter
+
+  if (keys & KEY_BUTTON) {
+      // Random shit
+      Board_LED_toggle();
+      return;
   }
 }
 

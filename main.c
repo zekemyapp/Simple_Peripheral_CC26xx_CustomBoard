@@ -61,6 +61,7 @@
 #include "bcomdef.h"
 #include "peripheral.h"
 #include "simple_peripheral.h"
+#include "board_key.h"
 
 /* Header files required to enable instruction fetch cache */
 #include <inc/hw_memmap.h>
@@ -74,12 +75,6 @@
 bleUserCfg_t user0Cfg = BLE_USER_CFG;
 
 #endif // USE_DEFAULT_USER_CFG
-
-#ifdef USE_DISPLAY
-#include <ti/mw/display/Display.h>
-#else
-#define Display_print0(handle, var1, var2, text) ({System_printf(text); System_printf("\n"); System_flush();})
-#endif
 
 #ifdef USE_FPGA
 #include <inc/hw_prcm.h>
@@ -115,6 +110,8 @@ bleUserCfg_t user0Cfg = BLE_USER_CFG;
  */
 
 const PIN_Config CustomGpioInitTable[] = {
+    Board_LED    | PIN_GPIO_OUTPUT_EN | PIN_GPIO_HIGH | PIN_PUSHPULL | PIN_DRVSTR_MAX,
+    Board_BUTTON | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_BOTHEDGES | PIN_HYSTERESIS,
     PIN_TERMINATE
 };
 
@@ -142,9 +139,6 @@ PIN_Handle radCtrlHandle;
 
 extern void AssertHandler(uint8 assertCause, uint8 assertSubcause);
 
-#ifdef USE_DISPLAY
-extern Display_Handle dispHandle;
-#endif
 
 /*******************************************************************************
  * @fn          Main
@@ -262,49 +256,41 @@ int main() {
  */
 void AssertHandler(uint8 assertCause, uint8 assertSubcause)
 {
-#ifdef USE_DISPLAY
-  // Open the display if the app has not already done so
-  if ( !dispHandle )
-  {
-    dispHandle = Display_open(Display_Type_LCD, NULL);
-  }
-#endif
 
-  Display_print0(dispHandle, 0, 0, ">>>STACK ASSERT");
+  System_printf(">>>STACK ASSERT\n");
 
   // check the assert cause
   switch (assertCause)
   {
     case HAL_ASSERT_CAUSE_OUT_OF_MEMORY:
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> OUT OF MEMORY!");
+      System_printf("***ERROR***\n");
+      System_printf(">> OUT OF MEMORY!\n");
       break;
 
     case HAL_ASSERT_CAUSE_INTERNAL_ERROR:
       // check the subcause
-      if (assertSubcause == HAL_ASSERT_SUBCAUSE_FW_INERNAL_ERROR)
-      {
-        Display_print0(dispHandle, 0, 0, "***ERROR***");
-        Display_print0(dispHandle, 2, 0, ">> INTERNAL FW ERROR!");
-      }
-      else
-      {
-        Display_print0(dispHandle, 0, 0, "***ERROR***");
-        Display_print0(dispHandle, 2, 0, ">> INTERNAL ERROR!");
+      if (assertSubcause == HAL_ASSERT_SUBCAUSE_FW_INERNAL_ERROR) {
+          System_printf("***ERROR***\n");
+          System_printf(">> INTERNAL FW ERROR!\n");
+      } else {
+          System_printf("***ERROR***\n");
+          System_printf(">> INTERNAL ERROR!\n");
       }
       break;
 
     case HAL_ASSERT_CAUSE_ICALL_ABORT:
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> ICALL ABORT!");
+      System_printf("***ERROR***\n");
+      System_printf(">> ICALL ABORT!\n");
       HAL_ASSERT_SPINLOCK;
       break;
 
     default:
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> DEFAULT SPINLOCK!");
+      System_printf("***ERROR***\n");
+      System_printf(">> DEFAULT SPINLOCK!\n");
       HAL_ASSERT_SPINLOCK;
   }
+
+  System_flush();
 
   return;
 }
