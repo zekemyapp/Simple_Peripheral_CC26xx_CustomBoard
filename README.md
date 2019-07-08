@@ -29,3 +29,4 @@ Regarding the application, only the modified files are included. You will need t
 
 - Enable/Disable advertisement on button press
 - Try OAD
+- Include circuit design files
