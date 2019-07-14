@@ -14,6 +14,8 @@ CC2640 RHB Package
 LED on DIO_11
 Button on DIO_12
 
+A reference design for this board can be found [here](http://www.ti.com/tool/TIDC-CC2650-UTAG)
+
 ## Requirements
 This example uses the Simple_Peripheral_CC26xxLP Stack provided for the CC2650 Launch Pad on the BLE Stack.
 
